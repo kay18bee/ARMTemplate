@@ -1,0 +1,231 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "storageAccountOne": {
+            "type": "string",
+            "metadata": {
+                "description": "This is the first storage account."
+            }
+        },
+        "publicIP": {
+            "type": "string",
+            "metadata": {
+                "description": "This is the public IP address."
+            }
+        },
+        "NSG": {
+            "type": "string",
+            "metadata": {
+                "description": "This is the network security group."
+            }
+        },
+        "VNet": {
+            "type": "string",
+            "metadata": {
+                "description": "This is the virtual network."
+            }
+        },
+        "subnetOne": {
+            "type": "string",
+            "metadata": {
+                "description": "This is the first subnet."
+            }
+        },
+        "VM": {
+            "type": "string",
+            "metadata": {
+                "description": "This is the first virtual machine."
+            }
+        },
+        "NICOne": {
+            "type": "string",
+            "metadata": {
+                "description": "This is the first network interface."
+            }
+        },
+        "adName": {
+            "type": "string",
+            "metadata": {
+                "description": "This is the name of admin of the VM."
+            }
+        },
+        "adPass": {
+            "type": "string",
+            "metadata": {
+                "description": "This is the password for the VM."
+            }
+        }
+    },
+    "functions": [],
+    "variables": {},
+    "resources": [
+     {
+         "name": "[parameters('storageAccountOne')]",
+         "type": "Microsoft.Storage/storageAccounts",
+         "apiVersion": "2021-04-01",
+         "location": "[resourceGroup().location]",
+         "tags": {
+             "displayName": "[parameters('storageAccountOne')]"
+         },
+         "sku": {
+             "name": "Standard_LRS"
+         },
+         "kind": "Storage"
+     },
+      
+     {
+         "name": "[parameters('publicIP')]",
+         "type": "Microsoft.Network/publicIPAddresses",
+         "apiVersion": "2020-11-01",
+         "location": "[resourceGroup().location]",
+         "tags": {
+             "displayName": "PublicIPAddress"
+         },
+         "properties": {
+             "publicIPAllocationMethod": "Dynamic",
+             "dnsSettings": {
+                 "domainNameLabel": "[parameters('VM')]"
+             }
+         }
+     },
+     {
+         "name": "[parameters('NSG')]",
+         "type": "Microsoft.Network/networkSecurityGroups",
+         "apiVersion": "2020-11-01",
+         "location": "[resourceGroup().location]",
+         "properties": {
+             "securityRules": [
+                 {
+                     "name": "nsgRule1",
+                     "properties": {
+                         "description": "description",
+                         "protocol": "Tcp",
+                         "sourcePortRange": "*",
+                         "destinationPortRange": "22",
+                         "sourceAddressPrefix": "*",
+                         "destinationAddressPrefix": "*",
+                         "access": "Allow",
+                         "priority": 100,
+                         "direction": "Inbound"
+                     }
+                 }
+             ]
+         }
+     },
+    
+     {
+         "name": "[parameters('VNet')]",
+         "type": "Microsoft.Network/virtualNetworks",
+         "apiVersion": "2020-11-01",
+         "location": "[resourceGroup().location]",
+         "dependsOn": [
+             "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('NSG'))]"
+         ],
+         "tags": {
+             "displayName": "[parameters('VNet')]"
+         },
+         "properties": {
+             "addressSpace": {
+                 "addressPrefixes": [
+                     "10.1.0.0/16"
+                 ]
+             },
+             "subnets": [
+                 {
+                     "name": "[parameters('subnetOne')]",
+                     "properties": {
+                         "addressPrefix": "10.1.1.0/24",
+                         "networkSecurityGroup": {
+                             "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('NSG'))]"
+                         }
+                     }
+                 }
+             ]
+         }
+     },
+      {
+
+      
+          "name": "[parameters('NICOne')]",
+         "type": "Microsoft.Network/networkInterfaces",
+         "apiVersion": "2020-11-01",
+         "location": "[resourceGroup().location]",
+         "dependsOn": [
+             "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIP'))]",
+             "[resourceId('Microsoft.Network/virtualNetworks', parameters('VNet'))]"
+         ],
+         "tags": {
+             "displayName": "[parameters('NICOne')]"
+         },
+         "properties": {
+             "ipConfigurations": [
+                 {
+                     "name": "ipConfig1",
+                     "properties": {
+                         "privateIPAllocationMethod": "Dynamic",
+                         "publicIPAddress": {
+                             "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIP'))]"
+                         },
+                         "subnet": {
+                             "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('VNet'), parameters('subnetOne'))]"
+                         }
+                     }
+                 }
+             ]
+         }
+     },
+
+   {
+
+   
+         "name": "[parameters('VM')]",
+         "type": "Microsoft.Compute/virtualMachines",
+         "apiVersion": "2021-03-01",
+         "location": "[resourceGroup().location]",
+         "dependsOn": [
+             "[resourceId('Microsoft.Network/networkInterfaces', parameters('NICOne'))]"
+         ],
+         "tags": {
+             "displayName": "[parameters('VM')]"
+         },
+         "properties": {
+             "hardwareProfile": {
+                 "vmSize": "Standard_D2ads_v5"
+             },
+             "osProfile": {
+                 "computerName": "[parameters('VM')]",
+                 "adminUsername": "[parameters('adName')]",
+                 "adminPassword": "[parameters('adpass')]"
+             },
+             "storageProfile": {
+                 "imageReference": {
+                     "publisher": "Canonical",
+                     "offer": "UbuntuServer",
+                     "sku": "16.04-LTS",
+                     "version": "latest"
+                 },
+                 "osDisk": {
+                     "name": "ubuntuVM1-OSDisk",
+                     "caching": "ReadWrite",
+                     "createOption": "FromImage"
+                 }
+             },
+             "networkProfile": {
+                 "networkInterfaces": [
+                     {
+                         "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('NICOne'))]"
+                     }
+                 ]
+             },
+             "diagnosticsProfile": {
+                 "bootDiagnostics": {
+                     "enabled": true,
+                     "storageUri": "[reference(resourceId('Microsoft.Storage/storageAccounts/', parameters('storageAccountOne'))).primaryEndpoints.blob]"
+                 }
+             }
+         }
+     }
+    ],
+    "outputs": {}
+}
